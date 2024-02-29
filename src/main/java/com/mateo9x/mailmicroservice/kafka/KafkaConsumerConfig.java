@@ -1,7 +1,10 @@
 package com.mateo9x.mailmicroservice.kafka;
 
+import com.mateo9x.mailmicroservice.services.MailService;
+import lombok.AllArgsConstructor;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,17 +14,19 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
-import org.springframework.messaging.handler.annotation.Payload;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @EnableKafka
 @Configuration
+@AllArgsConstructor
 public class KafkaConsumerConfig {
 
+    private final MailService mailService;
+
     @Bean
-    public ConsumerFactory<String, String> consumerFactory() {
+    public ConsumerFactory<String, Object> consumerFactory() {
         Map<String, Object> props = new HashMap<>();
         props.put(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -39,9 +44,9 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, String>
+    public ConcurrentKafkaListenerContainerFactory<String, Object>
     kafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
         return factory;
@@ -54,8 +59,9 @@ public class KafkaConsumerConfig {
 
     @KafkaListener(
             topics = "emails")
-    public void listenWithFilter(@Payload String message,
+    public void listenWithFilter(ConsumerRecord<String, KafkaMailDto> message,
                                  @Header(KafkaHeaders.RECEIVED_PARTITION) int partition) {
         System.out.println(String.format("Received message partition: %d in filtered listener: %s ", partition, message));
+        mailService.handleMailMessage(message.value());
     }
 }
